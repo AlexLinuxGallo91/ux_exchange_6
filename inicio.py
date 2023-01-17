@@ -1,5 +1,6 @@
 import json
 import sys
+import logging
 
 from src.evaluacion_json import constantes_json
 from src.evaluacion_json.generador_json_log_base import GeneradorJsonBaseEvaluacion
@@ -24,25 +25,32 @@ def generar_test_json(driver, url_a_navegar, correo):
     objeto_json = GeneradorJsonBaseEvaluacion.generar_nuevo_template_json()
 
     # establece el datetime de inicio dentro del json
-    objeto_json = EvaluacionStepsJson.establecer_fecha_tiempo_de_inicio(objeto_json)
+    objeto_json = EvaluacionStepsJson.establecer_fecha_tiempo_de_inicio(
+        objeto_json)
 
     # empieza la primera validacion de ingresar a la url del portal
-    lista_validaciones = EvaluacionesHtml.navegar_a_portal_principal_owa(driver, url_a_navegar, lista_validaciones)
+    lista_validaciones = EvaluacionesHtml.navegar_a_portal_principal_owa(
+        driver, url_a_navegar, lista_validaciones)
 
     # intenta ingresar las credenciales de la cuenta dentro del portal, verificando el acceso del correo desde el portal
-    lista_validaciones = EvaluacionesHtml.iniciar_sesion_en_owa(driver, correo, lista_validaciones)
+    lista_validaciones = EvaluacionesHtml.iniciar_sesion_en_owa(
+        driver, correo, lista_validaciones)
 
     # empieza la validacion de la navegacion en cada una de las carpetas que se obtuvieron en la linea anterior
-    lista_validaciones = EvaluacionesHtml.navegacion_de_carpetas_por_segundos(correo, driver, lista_validaciones)
+    lista_validaciones = EvaluacionesHtml.navegacion_de_carpetas_por_segundos(
+        correo, driver, lista_validaciones)
 
     # se valida el cierre de sesion desde el OWA
-    lista_validaciones = EvaluacionesHtml.cerrar_sesion(driver, lista_validaciones, correo)
+    lista_validaciones = EvaluacionesHtml.cerrar_sesion(
+        driver, lista_validaciones, correo)
 
     # establece los datos en el json con los resultados de cada una de las validaciones
-    objeto_json = EvaluacionStepsJson.formar_cuerpo_json(lista_validaciones, objeto_json, correo)
+    objeto_json = EvaluacionStepsJson.formar_cuerpo_json(
+        lista_validaciones, objeto_json, correo)
 
     # establecen el json generado dentro de otra structura JSON con el correo como nodo
-    objeto_json = GeneradorJsonBaseEvaluacion.establecer_estructura_principal_json(correo.correo, objeto_json)
+    objeto_json = GeneradorJsonBaseEvaluacion.establecer_estructura_principal_json(
+        correo.correo, objeto_json)
 
     return objeto_json
 
@@ -52,11 +60,13 @@ def iniciar_prueba(correo):
     global web_driver
     archivo_configuracion = FormatUtils.obtener_archivo_de_configuracion()
 
-    web_driver_por_utilizar = archivo_configuracion.get('Driver', 'driverPorUtilizar')
+    web_driver_por_utilizar = archivo_configuracion.get(
+        'Driver', 'driverPorUtilizar')
     path_web_driver = archivo_configuracion.get('Driver', 'ruta')
 
     # establece el driver por utilizar (chrome o firefox)
-    config_web_driver = ConfiguracionWebDriver(path_web_driver, web_driver_por_utilizar)
+    config_web_driver = ConfiguracionWebDriver(
+        path_web_driver, web_driver_por_utilizar)
     web_driver = config_web_driver.configurar_obtencion_web_driver()
 
     # se generan las validaciones y el resultado por medio de un objeto JSON
@@ -107,12 +117,32 @@ def main():
     correo_exchange = objeto_argumento_json['user']
     password_cuenta_exchange = objeto_argumento_json['password']
 
-    correo_por_probar = Correo(correo_exchange, password_cuenta_exchange, portal_url_exchange)
+    correo_por_probar = Correo(
+        correo_exchange, password_cuenta_exchange, portal_url_exchange)
 
     salida_log_json = iniciar_prueba(correo_por_probar)
 
     print(salida_log_json)
 
+    return salida_log_json
 
-main()
 
+try:
+    # creando logger
+    logging.basicConfig(level=logging.INFO, filemode='a',
+                        filename='./ux_owa.log',
+                        format='%(asctime)s :: %(levelname)s: %(message)s',
+                        datefmt='%d-%m-%Y %H:%M:%S')
+
+    logger = logging.getLogger(__name__)
+    salida_final_json_log = main()
+    logger.info(salida_final_json_log)
+
+except Exception as e:
+
+    # cierre del web_driver
+    if web_driver is not None:
+        web_driver.close()
+        web_driver.quit()
+
+    logger.error('sucedio un error en la ux: {}'.format(e))
